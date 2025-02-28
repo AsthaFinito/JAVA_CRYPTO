@@ -1,0 +1,15 @@
+I)
+Validation d'un certificat d'autorité à la racine => fourni les infos du certif, statut sur la sécurité du certif. 
+Si sécurité non suffisante ou certificat invalide => message d'erreur. 
+Faire les verif des extensions BasicConstraints et KeyUsage. Verifier période de validité. Lecture de fichier en 
+PEM ou DER puis création d'un objet de classe java.security.cert.X509Certificate. Vérif de la clé pub avec 
+java.security.cert.X509Certificate.verify
+
+II)
+Validation chaine de certificat => Comme validation de certif mais récursive, en verif toutes les signature, 
+emetteur et sujets. Utiliser un API de calcul (java.BigInteger) pour verifier racine RSA. Same pour verification
+ECDSA avec org.bouncycastle.math.ec.ECPoint. Faire les verif des extensions BasicConstraints et KeyUsage.
+
+III) 
+Telecherger le CRL pour chaque certificat pour verif du status de révocation. Vérification protocole OCSP. Faire en 
+sorte qu'on ne télécharge pas une CRL si elle n'a pas été update
