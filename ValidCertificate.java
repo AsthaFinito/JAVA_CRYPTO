@@ -22,11 +22,10 @@ public class ValidCertificate {
             System.out.println("Clé publique : " + publicKey);
             System.out.println("Algo : " + cert.getSigAlgName());
             if (isSelfSigned(cert)) {
-                System.out.println("Le certificat est auto-signé.");
+                System.out.println("Le certificat est auto-signé (signature valide)");
             } else {
-                System.out.println("Le certificat n'est pas auto-signé.");
+                System.out.println("Le certificat n'est pas auto-signé (pas de test signature encore)");
             }
-            cert.verify(publicKey);//A MODIF
             System.out.println("Sujet : " + cert.getSubjectX500Principal());
             System.out.println("Émetteur : " + cert.getIssuerX500Principal());
             checkKeyUsage(cert);
