@@ -7,6 +7,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Base64;
 
 public class ValidCertificate {
     public static void main(String[] args) {
@@ -141,6 +142,9 @@ public class ValidCertificate {
             Signature signatureVerifier = Signature.getInstance(signatureAlgorithm);
             signatureVerifier.initVerify(publicKey);
             signatureVerifier.update(cert.getEncoded());
+            byte[] dataToVerify = cert.getEncoded();
+            //System.out.println("Données à vérifier : " + Base64.getEncoder().encodeToString(dataToVerify));
+            //System.out.println("Signature reçue : " + Base64.getEncoder().encodeToString(signature));
             if (signatureVerifier.verify(signature)) {
                 System.out.println("La signature est valide");
             } else {
