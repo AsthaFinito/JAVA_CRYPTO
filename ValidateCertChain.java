@@ -1,16 +1,24 @@
 import java.io.File;
 import java.io.FileInputStream;
-import java.security.cert.Certificate;
+import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
 import java.util.HashSet;
 import java.util.Set;
+import java.math.BigInteger;
 
 public class ValidateCertChain {
     public static void main(String[] args) {
         if(processArguments(args)){
             X509Certificate[] certChain = loadCertificates(args);
-            validateCertificateChain(certChain);
+            if(!validateCertificateChain(certChain)){
+                System.out.println("validateCertificateChain failed");
+                return;
+            }
+            if(!verifySignatureBigInteger(certChain)){
+                System.out.println("verifySignatureBigInteger failed");
+            }
         }
         
                 
@@ -144,6 +152,15 @@ public class ValidateCertChain {
                 
             }
         
+        /**
+         * Validates the certificate chain by checking the signature of each certificate
+         * in the chain using the public key of the previous certificate, and by
+         * checking that the subject of each certificate matches the issuer of the
+         * previous certificate.
+         * 
+         * @param certChain The array of X509 certificates to validate.
+         * @return true if the certificate chain is valid, false otherwise.
+         */
             public static boolean validateCertificateChain(X509Certificate[] certChain) {
                 for (int i = 1; i < certChain.length; i++) {
                     X509Certificate currentCert = certChain[i];
@@ -204,5 +221,51 @@ public class ValidateCertChain {
         else{
             return false;
         }
+    }
+
+    public static boolean verifySignatureBigInteger(X509Certificate[] certChain) {
+
+        if (certChain[0].getSigAlgName().contains("RSA")){
+            System.out.println("Checking RSA signature");
+            verifySignatureRSABigInteger(certChain);
+            return false;
+        }
+        else if(certChain[0].getSigAlgName().contains("ECDSA")){
+            return true;
+        }
+        else{
+            System.out.println("Signature non pris en charge");
+            return false;
+        }
+    }
+
+    private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain) {
+        try {
+            for (int i = 0; i < certChain.length; i++) {
+                X509Certificate currentCert = certChain[i];
+               //ROOT
+                if (i == 0) {
+                    continue;
+                }
+                RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
+                byte[] data_current_cert = currentCert.getEncoded();//data
+                byte[] signature_current_cert = currentCert.getSignature();
+                BigInteger modulus = publicKey.getModulus();
+                BigInteger exponent = publicKey.getPublicExponent();
+                BigInteger signature = new BigInteger(1, signature_current_cert);
+                BigInteger data = new BigInteger(1, data_current_cert);
+                BigInteger result = signature.modPow(exponent, modulus);
+                if (result.equals(data)) {
+                    System.out.println("La signature est valide");
+                } else {
+                    System.out.println("La signature est invalide");
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Erreur de signature RSA BIG INTEGER: " + e.getMessage());
+        }
+        
+    return true;
     }
 }
