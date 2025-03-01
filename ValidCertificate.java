@@ -25,6 +25,7 @@ public class ValidCertificate {
                 System.out.println("Le certificat est auto-signé (signature valide)");
             } else {
                 System.out.println("Le certificat n'est pas auto-signé (pas de test signature encore)");
+                //cert.getIssuerX500Principal().getPublicKey();
             }
             System.out.println("Sujet : " + cert.getSubjectX500Principal());
             System.out.println("Émetteur : " + cert.getIssuerX500Principal());
@@ -136,14 +137,24 @@ public class ValidCertificate {
             }
     }
 
+    /**
+     * Checks the signature of the given X509 certificate using the given public
+     * key and signature algorithm.
+     * 
+     * The method prints a message indicating whether the signature is valid or
+     * not.
+     * 
+     * @param cert The X509 certificate to check.
+     * @param publicKey The public key to use when verifying the signature.
+     * @param signatureAlgorithm The algorithm to use when verifying the
+     *            signature.
+     * @param signature The signature to verify.
+     */
     public static void checkSignatureAPICrypto(X509Certificate cert,PublicKey publicKey,String signatureAlgorithm,byte[] signature){
         try{
             Signature signatureVerifier = Signature.getInstance(signatureAlgorithm);
             signatureVerifier.initVerify(publicKey);
-            signatureVerifier.update(cert.getEncoded());
-            byte[] dataToVerify = cert.getEncoded();
-            //System.out.println("Données à vérifier : " + Base64.getEncoder().encodeToString(dataToVerify));
-            //System.out.println("Signature reçue : " + Base64.getEncoder().encodeToString(signature));
+            signatureVerifier.update(cert.getTBSCertificate());
             if (signatureVerifier.verify(signature)) {
                 System.out.println("La signature est valide");
             } else {

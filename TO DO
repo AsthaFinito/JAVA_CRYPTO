@@ -13,3 +13,11 @@ ECDSA avec org.bouncycastle.math.ec.ECPoint. Faire les verif des extensions Basi
 III) 
 Telecherger le CRL pour chaque certificat pour verif du status de révocation. Vérification protocole OCSP. Faire en 
 sorte qu'on ne télécharge pas une CRL si elle n'a pas été update
+
+ROOT CA : 
+    -Global Sign
+    -User Trust
+BUG : 
+
+    - signature quand il eest pas autosigné dans le  (il faut le CA pour check la signature)
+    - 6 du 3.1 , pas compris
