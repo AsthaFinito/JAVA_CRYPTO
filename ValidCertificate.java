@@ -1,40 +1,17 @@
 import java.io.File;
 import java.io.FileInputStream;
-import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.Base64;
+
 
 public class ValidCertificate {
     public static void main(String[] args) {
         processArguments(args);
-        try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            FileInputStream fis = new FileInputStream(args[2]);//TODO multiple filename
-            X509Certificate cert = (X509Certificate) cf.generateCertificate(fis);
-            fis.close();
-            System.out.println("Numéro de série : " + cert.getSerialNumber());
-            PublicKey publicKey = cert.getPublicKey();
-            System.out.println("Clé publique : " + publicKey);
-            System.out.println("Algo : " + cert.getSigAlgName());
-            if (isSelfSigned(cert)) {
-                System.out.println("Le certificat est auto-signé (signature valide)");
-            } else {
-                System.out.println("Le certificat n'est pas auto-signé (pas de test signature encore)");
-                //cert.getIssuerX500Principal().getPublicKey();
-            }
-            System.out.println("Sujet : " + cert.getSubjectX500Principal());
-            System.out.println("Émetteur : " + cert.getIssuerX500Principal());
-            checkKeyUsage(cert);
-            checkValidityPeriod(cert);
-            checkSignatureAPICrypto(cert,publicKey,cert.getSigAlgName(),cert.getSignature());
-        } catch (Exception e) {
-            System.err.println("Erreur lors de la lecture du certificat : " + e.getMessage());
-        }
+        processVerif(args);
     }
 
     /**
@@ -50,7 +27,6 @@ public class ValidCertificate {
      */
 
     public static void processArguments(String[] args) {
-        System.out.println("Hello, World!");
         
         if (args.length != 3) {
             System.out.println("Format à respecter : -format <DER|PEM> <NameFile>");
@@ -164,5 +140,42 @@ public class ValidCertificate {
         catch (Exception e){
             System.out.println("Erreur lors de la mise à jour de la signature : " + e.getMessage());
         }
+    }
+
+    /**
+     * Processes the verification of a certificate from a given file.
+     * 
+     * Prints information about the certificate, including its serial number, public
+     * key, signature algorithm, subject, issuer, key usage, validity period, and
+     * signature verification result.
+     * 
+     * @param args The command line arguments, where args[0] is the command name, and
+     *            args[2] is the path to the certificate file to verify.
+     */
+    public static void processVerif(String[] args) {    
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            FileInputStream fis = new FileInputStream(args[2]);
+            X509Certificate cert = (X509Certificate) cf.generateCertificate(fis);
+            fis.close();
+            System.out.println("Numéro de série : " + cert.getSerialNumber());
+            PublicKey publicKey = cert.getPublicKey();
+            System.out.println("Clé publique : " + publicKey);
+            System.out.println("Algo : " + cert.getSigAlgName());
+            if (isSelfSigned(cert)) {
+                System.out.println("Le certificat est auto-signé (signature valide)");
+            } else {
+                System.out.println("Le certificat n'est pas auto-signé");
+                System.out.println("Certificat invalide dans le cadre du projet (NOT SELF_SIGNED)");
+                return;
+            }
+            System.out.println("Sujet : " + cert.getSubjectX500Principal());
+            System.out.println("Émetteur : " + cert.getIssuerX500Principal());
+            checkKeyUsage(cert);
+            checkValidityPeriod(cert);
+            checkSignatureAPICrypto(cert,publicKey,cert.getSigAlgName(),cert.getSignature());
+        } catch (Exception e) {
+            System.err.println("Erreur lors de la lecture du certificat : " + e.getMessage());
+        }     
     }
 }
