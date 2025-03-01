@@ -1,5 +1,6 @@
 import java.io.File;
 import java.io.FileInputStream;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -227,7 +228,10 @@ public class ValidateCertChain {
 
         if (certChain[0].getSigAlgName().contains("RSA")){
             System.out.println("Checking RSA signature");
-            verifySignatureRSABigInteger(certChain);
+            String hashFunction = certChain[0].getSigAlgName().split("with")[0];
+
+            System.out.println("Fonction de hachage utilisée : " + hashFunction);
+            verifySignatureRSABigInteger(certChain,hashFunction);
             return false;
         }
         else if(certChain[0].getSigAlgName().contains("ECDSA")){
@@ -239,28 +243,33 @@ public class ValidateCertChain {
         }
     }
 
-    private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain) {
+    private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain,String hashFunction) {
         try {
             for (int i = 0; i < certChain.length; i++) {
                 X509Certificate currentCert = certChain[i];
                //ROOT
                 if (i == 0) {
-                    continue;
+                    System.out.println("SKIP");
                 }
-                RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
-                byte[] data_current_cert = currentCert.getEncoded();//data
-                byte[] signature_current_cert = currentCert.getSignature();
-                BigInteger modulus = publicKey.getModulus();
-                BigInteger exponent = publicKey.getPublicExponent();
-                BigInteger signature = new BigInteger(1, signature_current_cert);
-                BigInteger data = new BigInteger(1, data_current_cert);
-                BigInteger result = signature.modPow(exponent, modulus);
-                if (result.equals(data)) {
-                    System.out.println("La signature est valide");
-                } else {
-                    System.out.println("La signature est invalide");
-                    return false;
+                else{
+                    RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
+                    MessageDigest md = MessageDigest.getInstance("SHA-256");
+                    byte[] hash = md.digest(currentCert.getTBSCertificate());
+                
+                    // System.out.println(publicKey.getPublicExponent());
+                    // System.out.println(publicKey.getModulus());
+                    BigInteger signature = new BigInteger(1, currentCert.getSignature());
+                    BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());
+                    System.out.println("Result (hex) : " + result.toString(16));
+                    System.out.println("Hash (hex) : " + new BigInteger(1, hash).toString(16));
+                    if (result.equals(new BigInteger(1, hash))) {
+                        System.out.println("La signature est valide");
+                    } else {
+                        System.out.println("La signature est invalide");
+                        return false;
+                    }
                 }
+                
             }
         } catch (Exception e) {
             System.out.println("Erreur de signature RSA BIG INTEGER: " + e.getMessage());
