@@ -1,7 +1,8 @@
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.security.MessageDigest;
-import java.security.PublicKey;
+import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPublicKey;
@@ -9,9 +10,15 @@ import java.util.HashSet;
 import java.util.Set;
 import java.math.BigInteger;
 
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 public class ValidateCertChain {
     public static void main(String[] args) {
         if(processArguments(args)){
+            Security.addProvider(new BouncyCastleProvider());
             X509Certificate[] certChain = loadCertificates(args);
             if(!validateCertificateChain(certChain)){
                 System.out.println("validateCertificateChain failed");
@@ -243,6 +250,16 @@ public class ValidateCertChain {
         }
     }
 
+
+    private static byte[] extractHashFromASN1(byte[] decryptedSignature) throws IOException {
+        System.out.println("extracting hash");
+        ASN1InputStream asn1InputStream = new ASN1InputStream(decryptedSignature);
+        ASN1Sequence seq = (ASN1Sequence) asn1InputStream.readObject();
+        DEROctetString hashOctetString = (DEROctetString) seq.getObjectAt(1);
+        return hashOctetString.getOctets();
+}
+
+
     private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain,String hashFunction) {
         try {
             for (int i = 0; i < certChain.length; i++) {
@@ -258,10 +275,17 @@ public class ValidateCertChain {
                 
                     // System.out.println(publicKey.getPublicExponent());
                     // System.out.println(publicKey.getModulus());
-                    BigInteger signature = new BigInteger(1, currentCert.getSignature());
+                    byte[] signature2 = currentCert.getSignature();
+                    String signatureHex = String.format("%040x", new BigInteger(1, signature2));
+                    System.out.println("signature récup via le getSignature (hex) : " +signatureHex);
+                    BigInteger signature = new BigInteger(currentCert.getSignature());
                     BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());
-                    System.out.println("Result (hex) : " + result.toString(16));
-                    System.out.println("Hash (hex) : " + new BigInteger(1, hash).toString(16));
+                    System.out.println("Result (hex) : " + result.toString(16));//.indexOf("3031"));
+                    
+                    System.out.println("Hash (hex) : " + new BigInteger( hash).toString(16));
+                    //byte[] extractedHash = extractHashFromASN1(result.toByteArray());
+
+                    
                     if (result.equals(new BigInteger(1, hash))) {
                         System.out.println("La signature est valide");
                     } else {
