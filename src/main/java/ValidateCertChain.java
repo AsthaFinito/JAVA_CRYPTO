@@ -24,8 +24,15 @@ public class ValidateCertChain {
                 System.out.println("validateCertificateChain failed");
                 return;
             }
+            else{
+                System.out.println("validateCertificateChain passed");
+            }
+            //System.out.println(verifySignatureBigInteger(certChain));
             if(!verifySignatureBigInteger(certChain)){
                 System.out.println("verifySignatureBigInteger failed");
+            }
+            else{
+                System.out.println("verifySignatureBigInteger passed"); 
             }
         }
         
@@ -237,9 +244,11 @@ public class ValidateCertChain {
             System.out.println("Checking RSA signature");
             String hashFunction = certChain[0].getSigAlgName().split("with")[0];
 
-            System.out.println("Fonction de hachage utilisée : " + hashFunction);
-            verifySignatureRSABigInteger(certChain,hashFunction);
-            return false;
+           // System.out.println("Fonction de hachage utilisée : " + hashFunction);
+            if(!verifySignatureRSABigInteger(certChain,hashFunction)){
+                return false;
+            }
+            return true;
         }
         else if(certChain[0].getSigAlgName().contains("ECDSA")){
             return true;
@@ -251,14 +260,25 @@ public class ValidateCertChain {
     }
 
 
-    private static byte[] extractHashFromASN1(byte[] decryptedSignature) throws IOException {
-        System.out.println("extracting hash");
-        ASN1InputStream asn1InputStream = new ASN1InputStream(decryptedSignature);
-        ASN1Sequence seq = (ASN1Sequence) asn1InputStream.readObject();
-        DEROctetString hashOctetString = (DEROctetString) seq.getObjectAt(1);
-        return hashOctetString.getOctets();
-}
+    
 
+
+/**
+ * Verifies the RSA signature of each certificate in the provided certificate chain.
+ *
+ * This method iterates through the given array of X509 certificates (`certChain`) and verifies
+ * the RSA signature of each certificate using the public key from the previous certificate in
+ * the chain. For the root certificate (index 0), the signature is verified against its own
+ * public key. The verification process involves computing the hash of the certificate's 
+ * TBS (To Be Signed) portion using the specified hash function, and comparing it with the 
+ * decrypted signature value. If any signature verification fails, the method prints an 
+ * appropriate error message and returns false. If all signatures are verified successfully, 
+ * it prints a success message and returns true.
+ *
+ * @param certChain An array of X509 certificates representing the certificate chain.
+ * @param hashFunction The hash function used to compute the hash of the certificate's TBS portion.
+ * @return true if all signatures in the certificate chain are valid, false otherwise.
+ */
 
     private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain,String hashFunction) {
         try {
@@ -266,39 +286,49 @@ public class ValidateCertChain {
                 X509Certificate currentCert = certChain[i];
                //ROOT
                 if (i == 0) {
-                    System.out.println("SKIP");
-                }
-                else{
-                    RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
-                    MessageDigest md = MessageDigest.getInstance("SHA-256");
+                    RSAPublicKey publicKey = (RSAPublicKey) currentCert.getPublicKey();
+                    //System.out.println(currentCert.getSigAlgName());
+                    MessageDigest md = MessageDigest.getInstance(hashFunction);//TODO Every sha
                     byte[] hash = md.digest(currentCert.getTBSCertificate());
-                
-                    // System.out.println(publicKey.getPublicExponent());
-                    // System.out.println(publicKey.getModulus());
-                    byte[] signature2 = currentCert.getSignature();
-                    String signatureHex = String.format("%040x", new BigInteger(1, signature2));
-                    System.out.println("signature récup via le getSignature (hex) : " +signatureHex);
-                    BigInteger signature = new BigInteger(currentCert.getSignature());
-                    BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());
-                    System.out.println("Result (hex) : " + result.toString(16));//.indexOf("3031"));
-                    
-                    System.out.println("Hash (hex) : " + new BigInteger( hash).toString(16));
-                    //byte[] extractedHash = extractHashFromASN1(result.toByteArray());
 
-                    
-                    if (result.equals(new BigInteger(1, hash))) {
-                        System.out.println("La signature est valide");
-                    } else {
-                        System.out.println("La signature est invalide");
+                    BigInteger signature = new BigInteger(1, currentCert.getSignature());
+                    BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());
+                    if (!result.toString(16).contains(new BigInteger(1, hash).toString(16))) {
                         return false;
                     }
+                }    
+                else{
+                    RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
+                    // System.out.println("pubKey : "+certChain[i - 1].getPublicKey());
+                    // System.out.println("pubKeyRSA : "+publicKey);
+                    MessageDigest md = MessageDigest.getInstance("SHA-256");//TODO EVERY SHA 
+                    byte[] hash = md.digest(currentCert.getTBSCertificate()); //HASH(msg)
+                    // System.out.println("hash lengt : "+hash);
+                    // System.out.println("getPublicExponent : "+publicKey.getPublicExponent());
+                    // System.out.println("module : " +publicKey.getModulus().bitLength());
+                    byte[] signature2 = currentCert.getSignature();
+                    //String signatureHex = String.format("%040x", new BigInteger(1, signature2));
+                    // System.out.println("signature récup via le getSignature (hex) : " +signatureHex.length());
+                    BigInteger signature = new BigInteger(currentCert.getSignature());
+                    //System.out.println("signature (hex) lenght : " + result.bitLength());
+                    BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());//h'
+                    // System.out.println("Result (hex) lenght : " + result.toString(16));//.indexOf("3031"));
+                    // System.out.println("Result hash : " + new BigInteger(1, hash).toString(16));
+                    // System.out.println("getPublicExponent + getModulus : " +publicKey.getPublicExponent().bitLength()+" "+ publicKey.getModulus().bitLength());
+                    
+
+                    
+                    if (!result.toString(16).contains(new BigInteger(1, hash).toString(16))) {
+                        return false;
+                    } 
                 }
                 
             }
+        
         } catch (Exception e) {
             System.out.println("Erreur de signature RSA BIG INTEGER: " + e.getMessage());
         }
         
-    return true;
+        return true;
     }
 }
