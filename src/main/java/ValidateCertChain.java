@@ -5,20 +5,28 @@ import java.security.MessageDigest;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.HashSet;
 import java.util.Set;
 import java.math.BigInteger;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
+import org.bouncycastle.math.ec.ECPoint;
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1Integer;
+import org.bouncycastle.asn1.DLSequence;
+
 
 public class ValidateCertChain {
+    static{
+        Security.addProvider(new BouncyCastleProvider());
+    }
     public static void main(String[] args) {
         if(processArguments(args)){
-            Security.addProvider(new BouncyCastleProvider());
+            
             X509Certificate[] certChain = loadCertificates(args);
             if(!validateCertificateChain(certChain)){
                 System.out.println("validateCertificateChain failed");
@@ -239,10 +247,11 @@ public class ValidateCertChain {
     }
 
     public static boolean verifySignatureBigInteger(X509Certificate[] certChain) {
-
+        System.out.println(certChain[0].getSigAlgName());
+        String hashFunction = certChain[0].getSigAlgName().split("with")[0];
         if (certChain[0].getSigAlgName().contains("RSA")){
             System.out.println("Checking RSA signature");
-            String hashFunction = certChain[0].getSigAlgName().split("with")[0];
+           
 
            // System.out.println("Fonction de hachage utilisée : " + hashFunction);
             if(!verifySignatureRSABigInteger(certChain,hashFunction)){
@@ -251,6 +260,9 @@ public class ValidateCertChain {
             return true;
         }
         else if(certChain[0].getSigAlgName().contains("ECDSA")){
+            if(!verifySignatureECDSABigInteger(certChain,hashFunction)){
+                return false;
+            }
             return true;
         }
         else{
@@ -280,7 +292,7 @@ public class ValidateCertChain {
  * @return true if all signatures in the certificate chain are valid, false otherwise.
  */
 
-    private static boolean verifySignatureRSABigInteger(X509Certificate[] certChain,String hashFunction) {
+    public static boolean verifySignatureRSABigInteger(X509Certificate[] certChain,String hashFunction) {
         try {
             for (int i = 0; i < certChain.length; i++) {
                 X509Certificate currentCert = certChain[i];
@@ -288,7 +300,7 @@ public class ValidateCertChain {
                 if (i == 0) {
                     RSAPublicKey publicKey = (RSAPublicKey) currentCert.getPublicKey();
                     //System.out.println(currentCert.getSigAlgName());
-                    MessageDigest md = MessageDigest.getInstance(hashFunction);//TODO Every sha
+                    MessageDigest md = MessageDigest.getInstance(hashFunction);
                     byte[] hash = md.digest(currentCert.getTBSCertificate());
 
                     BigInteger signature = new BigInteger(1, currentCert.getSignature());
@@ -297,11 +309,11 @@ public class ValidateCertChain {
                         return false;
                     }
                 }    
-                else{
+                else{//TODO MAYBE ADD INTERVAL
                     RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
                     // System.out.println("pubKey : "+certChain[i - 1].getPublicKey());
                     // System.out.println("pubKeyRSA : "+publicKey);
-                    MessageDigest md = MessageDigest.getInstance("SHA-256");//TODO EVERY SHA 
+                    MessageDigest md = MessageDigest.getInstance(hashFunction);
                     byte[] hash = md.digest(currentCert.getTBSCertificate()); //HASH(msg)
                     // System.out.println("hash lengt : "+hash);
                     // System.out.println("getPublicExponent : "+publicKey.getPublicExponent());
@@ -329,6 +341,85 @@ public class ValidateCertChain {
             System.out.println("Erreur de signature RSA BIG INTEGER: " + e.getMessage());
         }
         
+        return true;
+    }
+
+
+
+    /**
+     * Extracts the curve name from an EC public key string in the format:
+     * "EC Public Key [curveName: ...]".
+     * 
+     * @param ecPublicKeyString The EC public key string.
+     * @return The extracted curve name, or null if not found.
+     */
+    public static String getCurveName(String ecPublicKeyString) {
+        int startIndex = ecPublicKeyString.indexOf(": ") + ": ".length();
+        int endIndex = ecPublicKeyString.indexOf(" [", startIndex);
+        if (startIndex >= 0 && endIndex >= 0) {
+            return ecPublicKeyString.substring(startIndex-1, endIndex);
+        } else {
+            return null; 
+        }
+    }
+    /**
+     * Extracts the public point from an EC public key.
+     * 
+     * @param ecPublicKey The EC public key.
+     * @return The extracted public point.
+     */
+    private static ECPoint extractPublicKeyBC(ECPublicKey ecPublicKey) {
+        BigInteger x = ecPublicKey.getW().getAffineX();
+        BigInteger y = ecPublicKey.getW().getAffineY();
+        // System.out.println("ecPublicKey : "+ecPublicKey.getParams());
+        // System.out.println("ecPublicKey : "+getCurveName(ecPublicKey.getParams().toString()));
+        ECNamedCurveParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec(getCurveName(ecPublicKey.getParams().toString()));
+        return ecSpec.getCurve().createPoint(x, y);
+    }
+
+    private static BigInteger[] extractRandS(byte[] signature) throws IOException {
+    try (ASN1InputStream asn1InputStream = new ASN1InputStream(signature)) {
+        DLSequence seq = (DLSequence) asn1InputStream.readObject();
+        BigInteger r = ((ASN1Integer) seq.getObjectAt(0)).getPositiveValue();
+        BigInteger s = ((ASN1Integer) seq.getObjectAt(1)).getPositiveValue();
+        return new BigInteger[]{r, s};
+    }
+}
+    public static boolean verifySignatureECDSABigInteger(X509Certificate[] certChain,String hashFunction){
+        try {
+            for (int i = 0; i < certChain.length; i++) {
+                X509Certificate currentCert = certChain[i];
+                if(i==0){
+                    System.out.println("SKIP");
+                }
+                else{
+                    MessageDigest md = MessageDigest.getInstance(hashFunction);
+                    byte[] hash = md.digest(currentCert.getTBSCertificate());
+
+                    ECPublicKey ecPublicKey = (ECPublicKey) certChain[i-1].getPublicKey();
+                   // System.out.println("ecPublicKey : "+ecPublicKey.getParams());
+                    ECPoint bcPoint = extractPublicKeyBC(ecPublicKey);
+                    System.out.println("bcPoint : "+bcPoint);
+                    //bcPoint.get
+                    //System.out.println(String.format("%040x", certChain[i].getSignature()));
+                    BigInteger[] rs = extractRandS(certChain[i].getSignature());
+                    BigInteger r = rs[0];
+                    BigInteger s = rs[1];
+                    System.out.println("r : "+r);
+                    System.out.println("s : "+s);
+                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
+                    BigInteger e = new BigInteger(1, hash);
+                    BigInteger u1 = e.multiply(w).mod(ecPublicKey.getParams().getOrder());
+                    BigInteger u2 = r.multiply(w).mod(ecPublicKey.getParams().getOrder());
+                    
+                }
+            }
+        }
+        catch (Exception e) {
+            System.out.println("Erreur de signature ECDSA BIG INTEGER: " + e.getMessage());
+        }
         return true;
     }
 }
