@@ -7,6 +7,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
+import java.security.spec.EllipticCurve;
 import java.util.HashSet;
 import java.util.Set;
 import java.math.BigInteger;
@@ -14,6 +15,9 @@ import java.math.BigInteger;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
+import org.bouncycastle.jce.spec.ECParameterSpec;
+import org.bouncycastle.math.ec.ECCurve;
+import org.bouncycastle.math.ec.ECMultiplier;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -368,13 +372,15 @@ public class ValidateCertChain {
      * @param ecPublicKey The EC public key.
      * @return The extracted public point.
      */
-    private static ECPoint extractPublicKeyBC(ECPublicKey ecPublicKey) {
+    private static ECPoint[] extractPublicKeyBC(ECPublicKey ecPublicKey) {
         BigInteger x = ecPublicKey.getW().getAffineX();
         BigInteger y = ecPublicKey.getW().getAffineY();
         // System.out.println("ecPublicKey : "+ecPublicKey.getParams());
         // System.out.println("ecPublicKey : "+getCurveName(ecPublicKey.getParams().toString()));
         ECNamedCurveParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec(getCurveName(ecPublicKey.getParams().toString()));
-        return ecSpec.getCurve().createPoint(x, y);
+        // System.out.println("ecSpec.getG() "+ecSpec.getG());
+        
+        return new ECPoint[]{ecSpec.getCurve().createPoint(x, y), ecSpec.getG()};
     }
 
     private static BigInteger[] extractRandS(byte[] signature) throws IOException {
@@ -382,9 +388,28 @@ public class ValidateCertChain {
         DLSequence seq = (DLSequence) asn1InputStream.readObject();
         BigInteger r = ((ASN1Integer) seq.getObjectAt(0)).getPositiveValue();
         BigInteger s = ((ASN1Integer) seq.getObjectAt(1)).getPositiveValue();
+        byte[] rBytes = ((ASN1Integer) seq.getObjectAt(0)).getValue().toByteArray();
+        byte[] sBytes = ((ASN1Integer) seq.getObjectAt(1)).getValue().toByteArray();
+        BigInteger r2 = new BigInteger(1, rBytes); // Utiliser le constructeur avec signe positif
+        BigInteger s2 = new BigInteger(1, sBytes); 
+       
+        // System.out.println("r2: " +r2.bitLength());
+        // System.out.println("s2 " + s2.bitLength());
+        // System.out.println("rBytes: " +rBytes.length);
+        // System.out.println("sBytes " + sBytes.length);
+        // System.out.println("r: " +r.bitLength());
+        // System.out.println("s " + s.bitLength());
+     
         return new BigInteger[]{r, s};
     }
 }
+
+    private static void multiplyBigIntegerEcPoint(ECPublicKey pk,BigInteger u){
+        java.security.spec.ECParameterSpec ecSpec = pk.getParams();
+        EllipticCurve curve = ecSpec.getCurve();
+        java.security.spec.ECPoint G = ecSpec.getGenerator();  
+    }
+    
     public static boolean verifySignatureECDSABigInteger(X509Certificate[] certChain,String hashFunction){
         try {
             for (int i = 0; i < certChain.length; i++) {
@@ -398,21 +423,48 @@ public class ValidateCertChain {
 
                     ECPublicKey ecPublicKey = (ECPublicKey) certChain[i-1].getPublicKey();
                    // System.out.println("ecPublicKey : "+ecPublicKey.getParams());
-                    ECPoint bcPoint = extractPublicKeyBC(ecPublicKey);
-                    System.out.println("bcPoint : "+bcPoint);
-                    //bcPoint.get
-                    //System.out.println(String.format("%040x", certChain[i].getSignature()));
+                    ECPoint[] points = extractPublicKeyBC(ecPublicKey);//Obtenir Q en ECPoint BOUNCYCASTLE
+                    //System.out.println("bcPoint : "+bcPoint);
+                    ECPoint Q = points[0]; 
+                    ECPoint G = points[1];
+                    //ECPoint N = points[2];
                     BigInteger[] rs = extractRandS(certChain[i].getSignature());
                     BigInteger r = rs[0];
                     BigInteger s = rs[1];
-                    System.out.println("r : "+r);
-                    System.out.println("s : "+s);
+                    System.out.println("r : "+r+" "+r.bitLength());
+                    System.out.println("s : "+s+" "+s.bitLength());
+                    System.out.println("n : "+ecPublicKey.getParams().getOrder()+" "+ecPublicKey.getParams().getOrder().bitLength());
                     if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
                     if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
                     BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
+                    System.out.println("w : "+w+" "+w.bitLength());
                     BigInteger e = new BigInteger(1, hash);
                     BigInteger u1 = e.multiply(w).mod(ecPublicKey.getParams().getOrder());
                     BigInteger u2 = r.multiply(w).mod(ecPublicKey.getParams().getOrder());
+                    System.out.println("u1 : " + u1.toString(16));
+                    System.out.println("u2 : " + u2.toString(16));
+                    System.out.println("G : " + G);
+                    System.out.println("Q : " + Q);             
+                    ECPoint u1G = G.multiply(u1).normalize();
+                    ECPoint u2Q = Q.multiply(u2).normalize();
+                    System.out.println("u1G : " + u1G);
+                    System.out.println("u2Q : " + u2Q);
+                    ECPoint P = u1G.add(u2Q).normalize();
+                    System.out.println("P : " + P);
+                    if (P.isInfinity()) {
+                        throw new IllegalStateException("Le point P est à l'infini, impossible d'obtenir la coordonnée X.");
+                    }
+                    System.out.println("x : " + P.getAffineXCoord().toBigInteger().toString(16)); // Affiche en hexadécimal
+                    System.out.println("y : " + P.getAffineYCoord().toBigInteger().toString(16));
+                    BigInteger xP = P.getAffineXCoord().toBigInteger().mod(ecPublicKey.getParams().getOrder());
+                    System.out.println("xP: "+xP +" "+xP.bitLength());
+                    
+                    if (xP.equals(r)) {
+                        System.out.println("Signature valide");
+                    } else {
+                        System.out.println("Signature invalide");
+                        return false;
+                    }
                     
                 }
             }
