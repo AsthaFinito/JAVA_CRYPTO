@@ -42,9 +42,17 @@ public class ValidateCertChain {
             //System.out.println(verifySignatureBigInteger(certChain));
             if(!verifySignatureBigInteger(certChain)){
                 System.out.println("verifySignatureBigInteger failed");
+                return;
             }
             else{
                 System.out.println("verifySignatureBigInteger passed"); 
+            }
+            if(!verifyKeyUsage(certChain)){
+                System.out.println("verifyKeyUsage failed");
+                return;
+            }
+            else{
+                System.out.println("verifyKeyUsage passed");
             }
         }
         
@@ -514,5 +522,65 @@ public class ValidateCertChain {
             System.out.println("Erreur de signature ECDSA BIG INTEGER: " + e.getMessage());
         }
         return true;
+    }
+
+
+    public static boolean verifyKeyUsage(X509Certificate[] certChain){
+        int LEVEL_CA=2;//0 -> root , 1 -> inter , 2-> leaf
+        try {
+            for (int i = 0; i < certChain.length; i++) {
+                if(i==0){
+                    LEVEL_CA=0;
+                }
+                else if(i==certChain.length){
+                    LEVEL_CA=2;
+                }
+                else{
+                    LEVEL_CA=1;
+                }
+                boolean[] keyUsage = certChain[i].getKeyUsage();
+
+                // MAP KEY USAGE
+                // keyUsage[0] = Digital Signature
+                // keyUsage[1] = Non Repudiation
+                // keyUsage[2] = Key Encipherment
+                // keyUsage[3] = Data Encipherment
+                // keyUsage[4] = Key Agreement
+                // keyUsage[5] = Key Cert Sign
+                // keyUsage[6] = CRL Sign
+                // keyUsage[7] = Encipher Only
+                // keyUsage[8] = Decipher Only
+                switch (LEVEL_CA) {
+                    case 0: //ROOT CA
+                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] || keyUsage[0] || keyUsage[2]) {
+                            System.out.println("Erreur :Key usage incorrecte sur le certificat root");
+                            return false;
+
+                        }
+                    case 1://INTERMEDIATE
+                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] ) {
+                            System.out.println("Erreur : Key usage incorrecte sur les ca intermediate");
+                            return false;
+
+                        }
+                    case 2://LEAF
+                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] || !keyUsage[0]) {
+                            System.out.println("Erreur :  Key usage incorrecte sur les leaf CA");
+                            return false;
+
+                        }
+                    
+                    default:
+                        System.out.println("Erreur : Niveau de certificat inconnu.");
+                        return false;
+
+                }
+            }
+            
+        } catch (Exception e) {
+            System.out.println("Erreur de verification key usage: " + e.getMessage());
+        }
+
+        return false;
     }
 }
