@@ -251,10 +251,10 @@ public class ValidateCertChain {
     }
 
     public static boolean verifySignatureBigInteger(X509Certificate[] certChain) {
-        System.out.println(certChain[0].getSigAlgName());
+        // System.out.println(certChain[0].getSigAlgName());
         String hashFunction = certChain[0].getSigAlgName().split("with")[0];
         if (certChain[0].getSigAlgName().contains("RSA")){
-            System.out.println("Checking RSA signature");
+            // System.out.println("Checking RSA signature");
            
 
            // System.out.println("Fonction de hachage utilisée : " + hashFunction);
@@ -384,6 +384,13 @@ public class ValidateCertChain {
         return new ECPoint[]{ecSpec.getCurve().createPoint(x, y), ecSpec.getG()};
     }
 
+    /**
+     * Extracts the two components (r and s) from an ECDSA signature byte array.
+     * 
+     * @param signature The ECDSA signature byte array.
+     * @return An array of two BigIntegers, r and s, the components of the signature.
+     * @throws IOException If there is a problem parsing the signature.
+     */
     private static BigInteger[] extractRandS(byte[] signature) throws IOException {
     try (ASN1InputStream asn1InputStream = new ASN1InputStream(signature)) {
         DLSequence seq = (DLSequence) asn1InputStream.readObject();
@@ -405,23 +412,55 @@ public class ValidateCertChain {
     }
 }
 
-    private static void multiplyBigIntegerEcPoint(ECPublicKey pk,BigInteger u){
-        java.security.spec.ECParameterSpec ecSpec = pk.getParams();
-        EllipticCurve curve = ecSpec.getCurve();
-        java.security.spec.ECPoint G = ecSpec.getGenerator();  
-    }
     
+    
+    /**
+     * Verifies the ECDSA signature of each certificate in the chain using the
+     * public key of the previous certificate, and by checking that the subject
+     * of each certificate matches the issuer of the previous certificate.
+     * 
+     * @param certChain The array of X509 certificates to validate.
+     * @param hashFunction The hash function name used for the signature [BUGGED]
+     * @return true if the certificate chain is valid, false otherwise.
+     */
     public static boolean verifySignatureECDSABigInteger(X509Certificate[] certChain,String hashFunction){
         try {
             for (int i = 0; i < certChain.length; i++) {
                 X509Certificate currentCert = certChain[i];
                 if(i==0){
-                    System.out.println("SKIP");
+                    // System.out.println("SKIP");
+                    ECPublicKey ecPublicKey = (ECPublicKey) certChain[i].getPublicKey();
+                    String hashFunction2 = certChain[i].getSigAlgName().split("with")[0];
+                    MessageDigest md = MessageDigest.getInstance(hashFunction2);
+                    byte[] hash = md.digest(currentCert.getTBSCertificate());
+                    ECPoint[] points = extractPublicKeyBC(ecPublicKey);
+                    ECPoint Q = points[0]; 
+                    ECPoint G = points[1];
+                    BigInteger[] rs = extractRandS(certChain[i].getSignature());
+                    BigInteger r = rs[0];
+                    BigInteger s = rs[1];
+                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
+                    BigInteger e = new BigInteger(1, hash);
+                    BigInteger u1 = e.multiply(w).mod(ecPublicKey.getParams().getOrder());
+                    BigInteger u2 = r.multiply(w).mod(ecPublicKey.getParams().getOrder());
+                    ECPoint u1G = G.multiply(u1).normalize();
+                    ECPoint u2Q = Q.multiply(u2).normalize();
+                    ECPoint P = u1G.add(u2Q).normalize();
+                    if (P.isInfinity()) {
+                        throw new IllegalStateException("Le point P est à l'infini, impossible d'obtenir la coordonnée X.");
+                    }
+                    BigInteger xP = P.getAffineXCoord().toBigInteger().mod(ecPublicKey.getParams().getOrder());
+                    if (!xP.equals(r)) {
+                        System.out.println("Signature invalide");
+                        return false;
+                    }
                 }
                 else{
                
                     String hashFunction2 = certChain[i].getSigAlgName().split("with")[0];
-                    System.out.println(hashFunction2);
+                    // System.out.println(hashFunction2);
                     MessageDigest md = MessageDigest.getInstance(hashFunction2);
                     byte[] hash = md.digest(currentCert.getTBSCertificate());
 
@@ -435,37 +474,35 @@ public class ValidateCertChain {
                     BigInteger[] rs = extractRandS(certChain[i].getSignature());
                     BigInteger r = rs[0];
                     BigInteger s = rs[1];
-                    System.out.println("r : "+r+" "+r.bitLength());
-                    System.out.println("s : "+s+" "+s.bitLength());
-                    System.out.println("n : "+ecPublicKey.getParams().getOrder()+" "+ecPublicKey.getParams().getOrder().bitLength());
+                    // System.out.println("r : "+r+" "+r.bitLength());
+                    // System.out.println("s : "+s+" "+s.bitLength());
+                    // System.out.println("n : "+ecPublicKey.getParams().getOrder()+" "+ecPublicKey.getParams().getOrder().bitLength());
                     if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
                     if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
                     BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
-                    System.out.println("w : "+w+" "+w.bitLength());
+                    // System.out.println("w : "+w+" "+w.bitLength());
                     BigInteger e = new BigInteger(1, hash);
                     BigInteger u1 = e.multiply(w).mod(ecPublicKey.getParams().getOrder());
                     BigInteger u2 = r.multiply(w).mod(ecPublicKey.getParams().getOrder());
-                    System.out.println("u1 : " + u1.toString(16));
-                    System.out.println("u2 : " + u2.toString(16));
-                    System.out.println("G : " + G);
-                    System.out.println("Q : " + Q);             
+                    // System.out.println("u1 : " + u1.toString(16));
+                    // System.out.println("u2 : " + u2.toString(16));
+                    // System.out.println("G : " + G);
+                    // System.out.println("Q : " + Q);             
                     ECPoint u1G = G.multiply(u1).normalize();
                     ECPoint u2Q = Q.multiply(u2).normalize();
-                    System.out.println("u1G : " + u1G);
-                    System.out.println("u2Q : " + u2Q);
+                    // System.out.println("u1G : " + u1G);
+                    // System.out.println("u2Q : " + u2Q);
                     ECPoint P = u1G.add(u2Q).normalize();
-                    System.out.println("P : " + P);
+                    // System.out.println("P : " + P);
                     if (P.isInfinity()) {
                         throw new IllegalStateException("Le point P est à l'infini, impossible d'obtenir la coordonnée X.");
                     }
-                    System.out.println("x : " + P.getAffineXCoord().toBigInteger().toString(16)); // Affiche en hexadécimal
-                    System.out.println("y : " + P.getAffineYCoord().toBigInteger().toString(16));
+                    // System.out.println("x : " + P.getAffineXCoord().toBigInteger().toString(16)); // Affiche en hexadécimal
+                    // System.out.println("y : " + P.getAffineYCoord().toBigInteger().toString(16));
                     BigInteger xP = P.getAffineXCoord().toBigInteger().mod(ecPublicKey.getParams().getOrder());
-                    System.out.println("xP: "+xP +" "+xP.bitLength());
+                    // System.out.println("xP: "+xP +" "+xP.bitLength());
                     
-                    if (xP.equals(r)) {
-                        System.out.println("Signature valide");
-                    } else {
+                    if (!xP.equals(r)) {
                         System.out.println("Signature invalide");
                         return false;
                     }
