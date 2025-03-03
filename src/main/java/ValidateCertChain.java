@@ -264,6 +264,7 @@ public class ValidateCertChain {
             return true;
         }
         else if(certChain[0].getSigAlgName().contains("ECDSA")){
+           
             if(!verifySignatureECDSABigInteger(certChain,hashFunction)){
                 return false;
             }
@@ -418,7 +419,10 @@ public class ValidateCertChain {
                     System.out.println("SKIP");
                 }
                 else{
-                    MessageDigest md = MessageDigest.getInstance(hashFunction);
+               
+                    String hashFunction2 = certChain[i].getSigAlgName().split("with")[0];
+                    System.out.println(hashFunction2);
+                    MessageDigest md = MessageDigest.getInstance(hashFunction2);
                     byte[] hash = md.digest(currentCert.getTBSCertificate());
 
                     ECPublicKey ecPublicKey = (ECPublicKey) certChain[i-1].getPublicKey();
