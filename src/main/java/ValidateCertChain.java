@@ -525,6 +525,16 @@ public class ValidateCertChain {
     }
 
 
+    /**
+     * Verifies the keyUsage extension of each certificate in the chain.
+     * 
+     * The method prints an error message if the extension is not present or if
+     * an error occurs during the check.
+     * 
+     * @param certChain The array of X509 certificates to validate.
+     * @return true if the keyUsage of the certificate chain is valid, false
+     *         otherwise.
+     */
     public static boolean verifyKeyUsage(X509Certificate[] certChain){
         int LEVEL_CA=2;//0 -> root , 1 -> inter , 2-> leaf
         try {
@@ -532,55 +542,67 @@ public class ValidateCertChain {
                 if(i==0){
                     LEVEL_CA=0;
                 }
-                else if(i==certChain.length){
+                else if(i==certChain.length-1){
                     LEVEL_CA=2;
                 }
                 else{
                     LEVEL_CA=1;
                 }
                 boolean[] keyUsage = certChain[i].getKeyUsage();
+                // System.out.println(i);
+                // if (keyUsage[0]) System.out.println("- Digital Signature : true");
+                // if (keyUsage[1]) System.out.println("- Non-Repudiation   : true");
+                // if (keyUsage[2]) System.out.println("- Key Encipherment  : true");
+                // if (keyUsage[3]) System.out.println("- Data Encipherment : true");
+                // if (keyUsage[4]) System.out.println("- Key Agreement     : true");
+                // if (keyUsage[5]) System.out.println("- Key Cert Sign     : true");
+                // if (keyUsage[6]) System.out.println("- CRL Sign          : true");
+                // if (keyUsage[7]) System.out.println("- Encipher Only     : true");
+                // if (keyUsage[8]) System.out.println("- Decipher Only     : true");
 
                 // MAP KEY USAGE
                 // keyUsage[0] = Digital Signature
                 // keyUsage[1] = Non Repudiation
                 // keyUsage[2] = Key Encipherment
-                // keyUsage[3] = Data Encipherment
-                // keyUsage[4] = Key Agreement
-                // keyUsage[5] = Key Cert Sign
+                // keyUsage[3] = Data Encipherment -> SI RSA
+                // keyUsage[4] = Key Agreement -> SI EC
+                // keyUsage[5] = Key Cert Sign 
                 // keyUsage[6] = CRL Sign
                 // keyUsage[7] = Encipher Only
                 // keyUsage[8] = Decipher Only
                 switch (LEVEL_CA) {
-                    case 0: //ROOT CA
-                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] || keyUsage[0] || keyUsage[2]) {
-                            System.out.println("Erreur :Key usage incorrecte sur le certificat root");
+                    case 0: // ROOT CA
+                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] || !keyUsage[6]) {
+                            System.out.println("Erreur : Key usage incorrecte sur le certificat root");
                             return false;
-
                         }
-                    case 1://INTERMEDIATE
-                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] ) {
-                            System.out.println("Erreur : Key usage incorrecte sur les ca intermediate");
+                        break;
+                
+                    case 1: // INTERMEDIATE CA
+                        if (!keyUsage[0]|| !keyUsage[5] || !keyUsage[6]) {
+                            System.out.println("Erreur : Key usage incorrecte sur les CA intermédiaires");
                             return false;
-
                         }
-                    case 2://LEAF
-                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[5] || !keyUsage[0]) {
-                            System.out.println("Erreur :  Key usage incorrecte sur les leaf CA");
+                        break;
+                
+                    case 2: // LEAF CA
+                        if (keyUsage == null || keyUsage.length < 6 || !keyUsage[0]) {
+                            System.out.println("Erreur : Key usage incorrecte sur les leaf CA");
                             return false;
-
                         }
-                    
+                        break;
+                
                     default:
                         System.out.println("Erreur : Niveau de certificat inconnu.");
                         return false;
-
                 }
+                
             }
             
         } catch (Exception e) {
             System.out.println("Erreur de verification key usage: " + e.getMessage());
         }
 
-        return false;
+        return true;
     }
 }
