@@ -54,6 +54,13 @@ public class ValidateCertChain {
             else{
                 System.out.println("verifyKeyUsage passed");
             }
+            if(!verifyBasicConstraints(certChain)){
+                System.out.println("verifyBasicConstraints failed");
+                return;
+            }
+            else{
+                System.out.println("verifyBasicConstraints passed");
+            }
         }
         
                 
@@ -603,6 +610,37 @@ public class ValidateCertChain {
             System.out.println("Erreur de verification key usage: " + e.getMessage());
         }
 
+        return true;
+    }
+
+    public static boolean verifyBasicConstraints(X509Certificate[] certChain){
+        try {
+            for (int i = 0; i < certChain.length; i++) {
+                int pathLen = certChain[i].getBasicConstraints();
+                // System.out.println(pathLen);
+                if((pathLen==0 || pathLen==-1) && i==0){
+                    System.out.println("Erreur sur la verif des contraints du root");
+                    return false;
+                }
+                else if((i==certChain.length-1)&& pathLen!=-1){
+                    System.out.println("Erreur sur la verif des contraints des leafs");
+                    return false;
+                }
+                else if((i==certChain.length-2)&& pathLen!=-0){
+                    System.out.println("Erreur sur la verif des contraints des CA lenght-1");
+                    return false;
+                }
+                // else if((i!=0 || i!=certChain.length-1 ||i!=certChain.length-2)&& (pathLen==0 || pathLen==-1)){
+                //     System.out.println("Erreur sur la verif des contraints des CA intermediares (+de 3 CA CHAIn)");
+                //     return false;
+                // }
+
+            }
+
+
+        } catch (Exception e) {
+            System.out.println("Erreur de verifyBasicConstraints: " + e.getMessage());
+        }
         return true;
     }
 }
