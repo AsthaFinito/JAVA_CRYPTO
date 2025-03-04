@@ -1,4 +1,3 @@
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -8,15 +7,12 @@ import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
-
 import java.security.cert.X509CRL;
-
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.Set;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
@@ -28,7 +24,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
 import org.bouncycastle.math.ec.ECPoint;
 import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
-import org.bouncycastle.operator.OperatorException;
 import org.bouncycastle.operator.bc.BcDigestCalculatorProvider;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1InputStream;
@@ -38,7 +33,6 @@ import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERIA5String;
 import org.bouncycastle.asn1.DLSequence;
-import org.bouncycastle.asn1.ocsp.OCSPResponse;
 import org.bouncycastle.asn1.x509.AccessDescription;
 import org.bouncycastle.asn1.x509.AuthorityInformationAccess;
 import org.bouncycastle.asn1.x509.CRLDistPoint;
@@ -378,7 +372,6 @@ public class ValidateCertChain {
                     // System.out.println("hash lengt : "+hash);
                     // System.out.println("getPublicExponent : "+publicKey.getPublicExponent());
                     // System.out.println("module : " +publicKey.getModulus().bitLength());
-                    byte[] signature2 = currentCert.getSignature();
                     //String signatureHex = String.format("%040x", new BigInteger(1, signature2));
                     // System.out.println("signature récup via le getSignature (hex) : " +signatureHex.length());
                     BigInteger signature = new BigInteger(currentCert.getSignature());
@@ -451,10 +444,6 @@ public class ValidateCertChain {
         DLSequence seq = (DLSequence) asn1InputStream.readObject();
         BigInteger r = ((ASN1Integer) seq.getObjectAt(0)).getPositiveValue();
         BigInteger s = ((ASN1Integer) seq.getObjectAt(1)).getPositiveValue();
-        byte[] rBytes = ((ASN1Integer) seq.getObjectAt(0)).getValue().toByteArray();
-        byte[] sBytes = ((ASN1Integer) seq.getObjectAt(1)).getValue().toByteArray();
-        BigInteger r2 = new BigInteger(1, rBytes); // Utiliser le constructeur avec signe positif
-        BigInteger s2 = new BigInteger(1, sBytes); 
        
         // System.out.println("r2: " +r2.bitLength());
         // System.out.println("s2 " + s2.bitLength());
@@ -753,6 +742,22 @@ public class ValidateCertChain {
             return null;
         }
     }
+/**
+ * Downloads a Certificate Revocation List (CRL) from the specified URL.
+ * 
+ * This method attempts to download a CRL from the provided URL and cache it
+ * locally in the './src/certificats/crlList/' directory using the host name
+ * as the file name. If a valid cached CRL already exists, it will be used
+ * instead of downloading a new one. The method returns an X509CRL object 
+ * representing the CRL.
+ * 
+ * @param crlUrl The URL from which to download the CRL.
+ * @return An X509CRL object if the CRL is successfully downloaded or loaded
+ *         from cache.
+ * @throws Exception If an error occurs during the download or processing of
+ *         the CRL.
+ */
+
     public static X509CRL downloadCRL(String crlUrl) throws Exception {
         // System.out.println("Téléchargement de la CRL depuis : " + crlUrl);
         URI url = new URI(crlUrl);
