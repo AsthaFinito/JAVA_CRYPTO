@@ -14,7 +14,7 @@ import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.RSAPublicKey;
-
+import java.util.Date;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.Set;
@@ -734,20 +734,39 @@ public class ValidateCertChain {
         }
         return null;
     }
+/**
+ * Loads a CRL (Certificate Revocation List) from the specified file.
+ * 
+ * This method attempts to read and generate an X509CRL object from the given file,
+ * which is expected to contain a CRL in X.509 format.
+ * 
+ * @param crlFile The file containing the CRL to be loaded.
+ * @return An X509CRL object if the CRL is successfully loaded, null otherwise.
+ */
 
+    private static X509CRL loadCRLFromFile(File crlFile) {
+        try (InputStream fis = new FileInputStream(crlFile)) {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            return (X509CRL) cf.generateCRL(fis);
+        } catch (Exception e) {
+            System.err.println("Erreur lors du chargement de la CRL en cache : " + e.getMessage());
+            return null;
+        }
+    }
     public static X509CRL downloadCRL(String crlUrl) throws Exception {
         // System.out.println("Téléchargement de la CRL depuis : " + crlUrl);
         URI url = new URI(crlUrl);
         String buildCrlFilePath = "./src/certificats/crlList/"+url.getHost()+".crl";
-        String currentPath = new java.io.File(".").getCanonicalPath();
-        // System.out.println("Current dir:" + currentPath);
-
+        File crlFile = new File(buildCrlFilePath);
+        if (crlFile.exists()) {
+            X509CRL cachedCRL = loadCRLFromFile(crlFile);
+            if (cachedCRL != null && (cachedCRL.getNextUpdate() == null || !cachedCRL.getNextUpdate().before(new Date()))) {
+                System.out.println("Utilisation de la CRL en cache : " + buildCrlFilePath);
+                return cachedCRL;
+            }
+        }
        // Path crlFilePath = Paths.get(buildCrlFilePath);
         try (InputStream crlStream = url.toURL().openStream()) {
-            // Save CRL to local file
-           
-            
-            // Charger la CRL en tant qu'objet X509CRL
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             X509CRL crl = (X509CRL) cf.generateCRL(crlStream);
             // System.out.println("CRL téléchargée avec succès !");
@@ -816,6 +835,15 @@ public class ValidateCertChain {
         }
         return return_value;
     }
+
+/**
+ * Sends an OCSP request to the specified OCSP responder URL and returns the response.
+ *
+ * @param ocspUrl The URL of the OCSP responder to send the request to.
+ * @param ocspRequest The OCSP request as a byte array.
+ * @return The OCSP response as a byte array if the request is successful, or null if an error occurs.
+ * @throws Exception If an error occurs while creating the connection or sending the request.
+ */
 
     public static byte[] sendOCSPRequest(String ocspUrl, byte[] ocspRequest) {
         try {
