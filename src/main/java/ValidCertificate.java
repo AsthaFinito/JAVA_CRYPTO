@@ -22,6 +22,7 @@ public class ValidCertificate {
         }
         else{
             System.out.println("processVerif : PASS");
+            System.out.println("le certificat est un certificat root completement valide");
         }
         
     }
@@ -77,6 +78,7 @@ public class ValidCertificate {
     public static boolean isSelfSigned(X509Certificate cert) {//QUESTION 3.1.2
         try {
             if (!cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) {
+                System.out.println("le certificat n'est pas auto-signé");
                 return false;
             }
             PublicKey publicKey = cert.getPublicKey();
