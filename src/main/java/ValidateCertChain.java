@@ -56,50 +56,53 @@ public class ValidateCertChain {
         Security.addProvider(new BouncyCastleProvider());
     }
     public static void main(String[] args) {
-        if(processArguments(args)){
-            
+        if(processArguments(args)){//QUESTION 3.2.1
+            System.out.println("processArguments PASS");
             X509Certificate[] certChain = loadCertificates(args);
-            if(!validateCertificateChain(certChain)){
-                System.out.println("validateCertificateChain failed");
+            if(!validateCertificateChain(certChain)){//Question 3.2.1
+                System.out.println("validateCertificateChain FAILED");
                 return;
             }
             else{
-                System.out.println("validateCertificateChain passed");
+                System.out.println("validateCertificateChain PASS");
             }
             //System.out.println(verifySignatureBigInteger(certChain));
-            if(!verifySignatureBigInteger(certChain)){
-                System.out.println("verifySignatureBigInteger failed");
+            if(!verifySignatureBigInteger(certChain)){//QUESTION 3.2.2 / QUESTION 3.2.3
+                System.out.println("verifySignatureBigInteger FAILED");
                 return;
             }
             else{
-                System.out.println("verifySignatureBigInteger passed"); 
+                System.out.println("verifySignatureBigInteger PASS"); 
             }
-            if(!verifyKeyUsage(certChain)){
-                System.out.println("verifyKeyUsage failed");
+            if(!verifyKeyUsage(certChain)){//QUESTION 3.2.4
+                System.out.println("verifyKeyUsage FAILED");
                 return;
             }
             else{
-                System.out.println("verifyKeyUsage passed");
+                System.out.println("verifyKeyUsage PASS");
             }
-            if(!verifyBasicConstraints(certChain)){
-                System.out.println("verifyBasicConstraints failed");
+            if(!verifyBasicConstraints(certChain)){//QUESTION 3.2.5
+                System.out.println("verifyBasicConstraints FAILED");
                 return;
             }
             else{
-                System.out.println("verifyBasicConstraints passed");
+                System.out.println("verifyBasicConstraints PASS");
             }
-            if(!verifyRevocateStatus(certChain)){
-                System.out.println("verifyRevocateStatus failed");
+            if(!verifyRevocateStatus(certChain)){//QUESTION 3.3.1 / /QUESTION 3.3.2 / QUESTION 3.3.3
+                System.out.println("verifyRevocateStatus FAILED");
             }
             else{
-                System.out.println("verifyRevocateStatus passed");
+                System.out.println("verifyRevocateStatus PASS");
             }
-        
+            System.out.println("Chaine de certificat complement valide");
+        }
+        else{
+           System.out.println("processArguments FAILED");
         }
         
                 
         
-            }
+     }
         /**
          * Retrieves the file extension from a given file name.
          *
@@ -133,7 +136,7 @@ public class ValidateCertChain {
          * If any of these rules are not met, the method prints an error message and
          * returns.
          */
-            public static boolean processArguments(String[] args) {
+            public static boolean processArguments(String[] args) {//QUESTION 3.2.1
                 try{
                 if (args.length < 3) {
                     System.out.println("Format à respecter : -format <DER|PEM> <NameFileRCA> <NameFileICA> <...> <NameFileLCA>");
@@ -144,7 +147,8 @@ public class ValidateCertChain {
                     System.out.println("Erreur : First flag incorrect");
                     return false;
                 }
-                int numFiles = args.length - 2; // calculate the number of files
+                
+                int numFiles = args.length - 2;
                 Set<String> certNames = new HashSet<>();
                 File[] certFiles = new File[numFiles];
                 for (int i = 0; i < numFiles; i++) {
@@ -170,6 +174,7 @@ public class ValidateCertChain {
                     fis.close();
                     if(!isSelfSigned(cert)){
                         System.out.println("First certificat invalide (NOT SELF_SIGNED)");
+                        return false;
                     }
                 return true;
             }
@@ -216,9 +221,9 @@ public class ValidateCertChain {
                     for (int i = 2; i < args.length; i++) {
                         FileInputStream fis = new FileInputStream(args[i]);
                         X509Certificate cert = (X509Certificate) cf.generateCertificate(fis);
-                        certChain[i - 2] = cert; // supposons que vous avez une méthode loadCertificate pour charger un certificat à partir d'un fichier
+                        certChain[i - 2] = cert; 
                     }
-                    System.out.println("Tableau de certificats chargé.");
+                    //System.out.println("Tableau de certificats chargé.");
                     return certChain;
                     
                 } catch (Exception e) {
@@ -250,7 +255,7 @@ public class ValidateCertChain {
                         return false;
                     }
         }
-        System.out.println("Signature de la chaine de certificats valide.");
+        //System.out.println("Signature de la chaine de certificats valide.");
         return true;
     }
 
@@ -299,20 +304,29 @@ public class ValidateCertChain {
         }
     }
 
-    public static boolean verifySignatureBigInteger(X509Certificate[] certChain) {
+        /**
+         * Verifies the signature of each certificate in the provided certificate chain, using either RSA or ECDSA
+         * algorithms. The hash function used for the signature is determined by the algorithm name of the first
+         * certificate in the chain.
+         * 
+         * @param certChain The array of X509 certificates to verify.
+         * @return true if the signatures are valid, false otherwise.
+         */
+    public static boolean verifySignatureBigInteger(X509Certificate[] certChain) {//QUESTION 3.2.2 / QUESTION 3.2.3
         // System.out.println(certChain[0].getSigAlgName());
         String hashFunction = certChain[0].getSigAlgName().split("with")[0];
-        if (certChain[0].getSigAlgName().contains("RSA")){
+        if (certChain[0].getSigAlgName().contains("RSA")){//Question 3.2.2
             // System.out.println("Checking RSA signature");
            
 
            // System.out.println("Fonction de hachage utilisée : " + hashFunction);
             if(!verifySignatureRSABigInteger(certChain,hashFunction)){
+                System.out.println("signature rsa non valide");
                 return false;
             }
             return true;
         }
-        else if(certChain[0].getSigAlgName().contains("ECDSA")){
+        else if(certChain[0].getSigAlgName().contains("ECDSA")){//Question 3.2.3
            
             if(!verifySignatureECDSABigInteger(certChain,hashFunction)){
                 return false;
@@ -360,10 +374,11 @@ public class ValidateCertChain {
                     BigInteger signature = new BigInteger(1, currentCert.getSignature());
                     BigInteger result = signature.modPow(publicKey.getPublicExponent(), publicKey.getModulus());
                     if (!result.toString(16).contains(new BigInteger(1, hash).toString(16))) {
+                        System.out.println("CA ROOT INVALID SIGNATURE");
                         return false;
                     }
                 }    
-                else{//TODO MAYBE ADD INTERVAL
+                else{
                     RSAPublicKey publicKey = (RSAPublicKey) certChain[i - 1].getPublicKey();//clé n-1
                     // System.out.println("pubKey : "+certChain[i - 1].getPublicKey());
                     // System.out.println("pubKeyRSA : "+publicKey);
@@ -384,6 +399,7 @@ public class ValidateCertChain {
 
                     
                     if (!result.toString(16).contains(new BigInteger(1, hash).toString(16))) {
+                        System.out.println("CA"+certChain[i].getSubjectX500Principal().getName()+" INVALID SIGNATURE");                 
                         return false;
                     } 
                 }
@@ -467,7 +483,7 @@ public class ValidateCertChain {
      * @param hashFunction The hash function name used for the signature [BUGGED]
      * @return true if the certificate chain is valid, false otherwise.
      */
-    public static boolean verifySignatureECDSABigInteger(X509Certificate[] certChain,String hashFunction){
+    public static boolean verifySignatureECDSABigInteger(X509Certificate[] certChain,String hashFunction){//QUESTION 3.2.3
         try {
             for (int i = 0; i < certChain.length; i++) {
                 X509Certificate currentCert = certChain[i];
@@ -483,8 +499,15 @@ public class ValidateCertChain {
                     BigInteger[] rs = extractRandS(certChain[i].getSignature());
                     BigInteger r = rs[0];
                     BigInteger s = rs[1];
-                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
-                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) {
+                        System.out.println("Erreur : La valeur de r est invalide.");
+                        return false;
+                    }
+                    
+                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) {
+                        System.out.println("Erreur : La valeur de s est invalide.");
+                        return false;
+                    }                    
                     BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
                     BigInteger e = new BigInteger(1, hash);
                     BigInteger u1 = e.multiply(w).mod(ecPublicKey.getParams().getOrder());
@@ -497,7 +520,7 @@ public class ValidateCertChain {
                     }
                     BigInteger xP = P.getAffineXCoord().toBigInteger().mod(ecPublicKey.getParams().getOrder());
                     if (!xP.equals(r)) {
-                        System.out.println("Signature invalide");
+                        System.out.println("CA ROOT INVALID SIGNATURE");
                         return false;
                     }
                 }
@@ -521,8 +544,16 @@ public class ValidateCertChain {
                     // System.out.println("r : "+r+" "+r.bitLength());
                     // System.out.println("s : "+s+" "+s.bitLength());
                     // System.out.println("n : "+ecPublicKey.getParams().getOrder()+" "+ecPublicKey.getParams().getOrder().bitLength());
-                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
-                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) return false;
+                    if (r.compareTo(BigInteger.ONE) < 0 || r.compareTo(ecPublicKey.getParams().getOrder()) >= 0) {
+                        System.out.println("Erreur : La valeur de r est invalide");
+                        return false;
+                    }
+                    
+                    if (s.compareTo(BigInteger.ONE) < 0 || s.compareTo(ecPublicKey.getParams().getOrder()) >= 0) {
+                        System.out.println("Erreur : La valeur de s est invalide");
+                        return false;
+                    }
+                    
                     BigInteger w = s.modInverse(ecPublicKey.getParams().getOrder());
                     // System.out.println("w : "+w+" "+w.bitLength());
                     BigInteger e = new BigInteger(1, hash);
@@ -547,7 +578,7 @@ public class ValidateCertChain {
                     // System.out.println("xP: "+xP +" "+xP.bitLength());
                     
                     if (!xP.equals(r)) {
-                        System.out.println("Signature invalide");
+                        System.out.println("CA"+certChain[i].getSubjectX500Principal().getName()+" INVALID SIGNATURE");       
                         return false;
                     }
                     
@@ -655,7 +686,7 @@ public class ValidateCertChain {
      * @param certChain The array of X509 certificates to verify.
      * @return true if the certificate chain is valid, false otherwise.
      */
-    public static boolean verifyBasicConstraints(X509Certificate[] certChain){
+    public static boolean verifyBasicConstraints(X509Certificate[] certChain){//QUESTION 3.2.5
         // certChain[i].getExtensionValue()
         try {
             for (int i = 0; i < certChain.length; i++) {
@@ -695,18 +726,15 @@ public class ValidateCertChain {
      * @throws Exception If an error occurs while parsing the extension value.
      */
     private static String extractCrlUrlFromExtension(byte[] extensionValue) throws Exception {
-        // La valeur de l'extension est encapsulée dans un ASN1OctetString
+
         try (ASN1InputStream asn1InputStream = new ASN1InputStream(extensionValue)) {
             ASN1OctetString asn1OctetString = (ASN1OctetString) asn1InputStream.readObject();
 
-            // Lire la séquence ASN.1 contenue dans l'octet string
             try (ASN1InputStream asn1InputStream2 = new ASN1InputStream(asn1OctetString.getOctets())) {
                 ASN1Sequence asn1Sequence = (ASN1Sequence) asn1InputStream2.readObject();
 
-                // Parser la séquence comme un CRLDistPoint
                 CRLDistPoint crlDistPoint = CRLDistPoint.getInstance(asn1Sequence);
 
-                // Extraire les DistributionPoints
                 for (DistributionPoint distributionPoint : crlDistPoint.getDistributionPoints()) {
                     DistributionPointName dpn = distributionPoint.getDistributionPoint();
                     if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
@@ -765,13 +793,13 @@ public class ValidateCertChain {
         File crlFile = new File(buildCrlFilePath);
         if (crlFile.exists()) {
             X509CRL cachedCRL = loadCRLFromFile(crlFile);
-            if (cachedCRL != null && (cachedCRL.getNextUpdate() == null || !cachedCRL.getNextUpdate().before(new Date()))) {
+            if (cachedCRL != null && (cachedCRL.getNextUpdate() == null || !cachedCRL.getNextUpdate().before(new Date()))) {//QUESTION 3.3.1
                 System.out.println("Utilisation de la CRL en cache : " + buildCrlFilePath);
                 return cachedCRL;
             }
         }
        // Path crlFilePath = Paths.get(buildCrlFilePath);
-        try (InputStream crlStream = url.toURL().openStream()) {
+        try (InputStream crlStream = url.toURL().openStream()) {//QUESTION 3.3.1
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             X509CRL crl = (X509CRL) cf.generateCRL(crlStream);
             // System.out.println("CRL téléchargée avec succès !");
@@ -852,7 +880,6 @@ public class ValidateCertChain {
 
     public static byte[] sendOCSPRequest(String ocspUrl, byte[] ocspRequest) {
         try {
-            // Créez une connexion HTTP
             URI url = new URI(ocspUrl);
             URL url2 = url.toURL();
             HttpURLConnection connection = (HttpURLConnection) url2.openConnection();
@@ -875,7 +902,7 @@ public class ValidateCertChain {
         return null;
     }
 
-    public static boolean verifyRevocateStatus(X509Certificate[] certChain){
+    public static boolean verifyRevocateStatus(X509Certificate[] certChain){//QUESTION 3.3.1 / /QUESTION 3.3.2 / QUESTION 3.3.3
         try {
             for (int i = 0; i < certChain.length; i++) {
                 if(i==0){
@@ -887,13 +914,13 @@ public class ValidateCertChain {
                     // System.out.println("Valeur de l'extension CRL Distribution Points (hex) : " + hexValue);
                     String crlUrl = extractCrlUrlFromExtension(crl_sequence_byte);
                     // System.out.println("URL de la CRL : " + crlUrl);
-                    X509CRL cr = downloadCRL(crlUrl);
+                    X509CRL cr = downloadCRL(crlUrl);//QUESTION 3.3.1 / //QUESTION 3.3.3
                     if(cr.isRevoked(certChain[i])){
                         System.out.println("Erreur : Certificat révoqué");
                         return false;
                     }
                     //END P1
-                    byte[] byte_request=createOCSPRequest(certChain[i],certChain[i-1]);
+                    byte[] byte_request=createOCSPRequest(certChain[i],certChain[i-1]);//QUESTION 3.3.2
                     byte[] ocspResponseByte =sendOCSPRequest(getOCSPUrl(certChain[i]),byte_request);
                     if (ocspResponseByte != null ) {
                        OCSPResp ocspResponse = new OCSPResp(ocspResponseByte);
